@@ -97,7 +97,12 @@ public class DBTCPConnector implements DBConnector {
      */
     @Override
     public void requestStart(){
-        _myPort.get().requestStart();
+        MyPort myPort = _myPort.get();
+        if (null == myPort){
+            myPort = new MyPort();
+            _myPort.set( myPort );
+        }
+        myPort.requestStart();
     }
 
     /**
@@ -109,12 +114,16 @@ public class DBTCPConnector implements DBConnector {
      */
     @Override
     public void requestDone(){
-        _myPort.get().requestDone();
+        MyPort myPort = _myPort.get();
+        if (null != myPort){
+            myPort.requestDone();
+        }
+        _myPort.remove();
     }
 
     @Override
     public void requestEnsureConnection(){
-        _myPort.get().requestEnsureConnection();
+        getMyPort().requestEnsureConnection();
     }
 
     void _checkClosed(){
@@ -124,8 +133,7 @@ public class DBTCPConnector implements DBConnector {
 
     WriteResult _checkWriteError( DB db , MyPort mp , DBPort port , WriteConcern concern )
         throws MongoException, IOException {
-        CommandResult e = null;
-        e = port.runCommand( db , concern.getCommand() );
+        CommandResult e = port.runCommand( db , concern.getCommand() );
 
         if ( ! e.hasErr() )
             return new WriteResult( e , concern );
@@ -147,7 +155,7 @@ public class DBTCPConnector implements DBConnector {
         _checkClosed();
         checkMaster( false , true );
 
-        MyPort mp = _myPort.get();
+        MyPort mp = getMyPort();
         DBPort port = mp.get( true , ReadPreference.PRIMARY, hostNeeded );
 
         try {
@@ -210,7 +218,7 @@ public class DBTCPConnector implements DBConnector {
         _checkClosed();
         checkMaster( false, !secondaryOk );
 
-        final MyPort mp = _myPort.get();
+        final MyPort mp = getMyPort();
         final DBPort port = mp.get( false , readPref, hostNeeded );
 
         Response res = null;
@@ -562,9 +570,13 @@ public class DBTCPConnector implements DBConnector {
         return _maxBsonObjectSize.get();
     }
 
-    // expose for unit testing
+    // also used for unit testing
     MyPort getMyPort() {
-        return _myPort.get();
+        MyPort myPort = _myPort.get();
+        if (null != myPort)
+            return myPort;
+        else
+            return new MyPort();
     }
 
     private Mongo _mongo;
@@ -577,10 +589,6 @@ public class DBTCPConnector implements DBConnector {
 
     private final AtomicInteger _maxBsonObjectSize = new AtomicInteger(0);
 
-    private ThreadLocal<MyPort> _myPort = new ThreadLocal<MyPort>(){
-        protected MyPort initialValue(){
-            return new MyPort();
-        }
-    };
+    private ThreadLocal<MyPort> _myPort = new ThreadLocal<MyPort>();
 
 }
